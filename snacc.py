@@ -21,7 +21,7 @@ class Player(pygame.sprite.Sprite):
         self.directionY = 25
         self.points = 0
         # self.rect.move_ip(self.directionX, self.directionY)
-        # self.segments = []
+        self.segments = []
         # self.addSegment()
 
     # class Segment:
@@ -78,7 +78,28 @@ class Player(pygame.sprite.Sprite):
             
     def addPoints(self):
         self.points += 1
+        self.segments.append(PlayerSegment(self, len(self.segments)))
         
+class PlayerSegment(pygame.sprite.Sprite) :
+    def __init__(self, player, index):
+        super(PlayerSegment, self).__init__()
+        self.surf = pygame.Surface((25, 25))
+        self.surf.fill((254, 254, 254))
+        self.rect = self.surf.get_rect()
+        self.directionX = player.directionX
+        self.directionY = player.directionY
+        self.index = index
+        self.position = (list(player.rect.topleft)[0] - player.directionX, list(player.rect.topleft)[1])
+    
+    def update(self, player): 
+        if self.index == 0:
+            self.directionX = player.directionX
+            self.directionY = player.directionY
+        else:
+            self.directionX = player.segments[self.index - 1].directionX
+            self.directionY = player.segments[self.index - 1].directionY
+        self.rect.move_ip(self.directionX, self.directionY)
+
 
 class Food(pygame.sprite.Sprite):
     def __init__(self):
@@ -86,7 +107,7 @@ class Food(pygame.sprite.Sprite):
         self.surf = pygame.Surface((25, 25))
         self.surf.fill((100, 100, 100))
         self.rect = self.surf.get_rect()
-        self.position = (int(random.randint(0, SCREEN_HEIGHT/25)*25), int(random.randint(0, SCREEN_WIDTH/25)*25))
+        self.position = (int(random.randint(0, SCREEN_WIDTH/25)*25), int(random.randint(0, SCREEN_HEIGHT/25)*25))
         # if self.position[0] <= 0 or self.position[0] >= SCREEN_HEIGHT:
         #     self.position[0] = 25
         # if self.position[1] < 0 or self.position[1] > SCREEN_WIDTH:
@@ -94,14 +115,14 @@ class Food(pygame.sprite.Sprite):
     
     def update(self, player, pressed_keys):
         if self.position == player.rect.topleft:
-            self.position = (int(random.randint(0, SCREEN_HEIGHT/25)*25), int(random.randint(0, SCREEN_WIDTH/25)*25))
+            self.position = (int(random.randint(0, SCREEN_WIDTH/25)*25), int(random.randint(0, SCREEN_HEIGHT/25)*25))
             player.addPoints()
             # if self.position[0] <= 0 or self.position[0] >= SCREEN_HEIGHT:
             #     self.position[0] = 25
             # if self.position[1] < 0 or self.position[1] > SCREEN_WIDTH:
             #     self.position[1] = 25
         if pressed_keys[K_SPACE]:
-            self.position = (int(random.randint(0, SCREEN_HEIGHT/25)*25), int(random.randint(0, SCREEN_WIDTH/25)*25))
+            self.position = (int(random.randint(0, SCREEN_WIDTH/25)*25), int(random.randint(0, SCREEN_HEIGHT/25)*25))
             
 
 
@@ -134,11 +155,14 @@ while running:
     food.update(player, pressed_keys)
 
     screen.fill((0, 0, 0))
+
+    for segment in player.segments:
+        segment.update(player)
+        screen.blit(segment.surf, segment.position)
     
     screen.blit(food.surf, food.position)
 
     screen.blit(player.surf, player.rect)
-
 
     pygame.display.flip()
 print(player.points)
