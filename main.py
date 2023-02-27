@@ -136,9 +136,6 @@ class Food(pygame.sprite.Sprite):
         if self.position == player.rect.topleft:
             self.position = (int(random.randint(0, (SCREEN_WIDTH - 25)/25)*25), int(random.randint(0, (SCREEN_HEIGHT - 25)/25)*25))
             player.addPoints()
-        if pressed_keys[K_SPACE]:
-            self.position = (int(random.randint(0, (SCREEN_WIDTH - 25)/25)*25), int(random.randint(0, (SCREEN_HEIGHT - 25)/25)*25))
-            print(self.position)
             
 
 
