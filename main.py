@@ -6,9 +6,11 @@ from pygame.locals import (
     K_LEFT,
     K_RIGHT,
     K_ESCAPE,
+    K_SPACE,
     KEYDOWN,
     QUIT,
-    MOUSEBUTTONDOWN
+    MOUSEBUTTONDOWN,
+    K_p
 )
 
 class Player(pygame.sprite.Sprite):
@@ -28,14 +30,17 @@ class Player(pygame.sprite.Sprite):
         
     def update(self, pressed_keys):
         moved = False
-        if len(self.queuedDirections) > 0:
-            if self.directionX == -self.queuedDirections[0][0] and self.directionY == -self.queuedDirections[0][1]:
-                pass
-            elif not (self.directionX == self.queuedDirections[0][0] and self.directionY == self.queuedDirections[0][1]):
-                self.directionX = self.queuedDirections[0][0]
-                self.directionY = self.queuedDirections[0][1]
-                moved = True
-            self.queuedDirections.pop(0)
+        while not moved:
+            if len(self.queuedDirections) > 0:
+                if self.directionX == -self.queuedDirections[0][0] and self.directionY == -self.queuedDirections[0][1]:
+                    pass
+                elif not (self.directionX == self.queuedDirections[0][0] and self.directionY == self.queuedDirections[0][1]):
+                    self.directionX = self.queuedDirections[0][0]
+                    self.directionY = self.queuedDirections[0][1]
+                    moved = True
+                self.queuedDirections.pop(0)
+            else:
+                break
         
         if pressed_keys[K_UP]:
             if moved:
@@ -102,7 +107,7 @@ class Player(pygame.sprite.Sprite):
         self.points += 1
         self.segments.append(PlayerSegment(self, len(self.segments)))
         
-class PlayerSegment(pygame.sprite.Sprite) :
+class PlayerSegment(pygame.sprite.Sprite):
     def __init__(self, player, index):
         super(PlayerSegment, self).__init__()
         self.surf = pygame.Surface((25, 25))
@@ -135,7 +140,34 @@ class Food(pygame.sprite.Sprite):
         if self.position == player.rect.topleft:
             self.position = (int(random.randint(0, (SCREEN_WIDTH - 25)/25)*25), int(random.randint(0, (SCREEN_HEIGHT - 25)/25)*25))
             player.addPoints()
+        if pressed_keys[K_SPACE]:
+            self.position = (int(random.randint(0, (SCREEN_WIDTH - 25)/25)*25), int(random.randint(0, (SCREEN_HEIGHT - 25)/25)*25))
+            print(self.position)
             
+
+def pauseloop():
+    running = True
+    screen.fill((0, 0, 0))
+    font = pygame.font.SysFont('Comic Sans MS', 30)
+    secondfont = pygame.font.SysFont('Comic Sans MS', 15)
+    text = font.render("Paused.", False, (255, 255, 255))
+    textrect = text.get_rect()
+    textrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) - 25)
+    secondtext = secondfont.render("Click anywhere to resume.", False, (255, 255, 255))
+    secondtextrect = secondtext.get_rect()
+    secondtextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2))
+    screen.blit(text, textrect)
+    screen.blit(secondtext, secondtextrect)
+    pygame.display.flip()
+    while running:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    quit()
+            if event.type == QUIT:
+                quit()
+            if event.type == MOUSEBUTTONDOWN:
+                running = False
 
 
 pygame.init()
@@ -147,20 +179,43 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 running = True
 clock = pygame.time.Clock()
 
+f = open("qwerty.uiop", "r")
+highscore = int(f.read(10))
+f.close()
+
+font = pygame.font.SysFont('Comic Sans MS', 30)
+secondfont = pygame.font.SysFont('Comic Sans MS', 15)
+text = secondfont.render("Arrow Keys to move - P to pause - Click to start", False, (255, 255, 255))
+textrect = text.get_rect()
+textrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) + 25)
+title = font.render("Python (The Game)", False, (255, 255, 255))
+titlerect = title.get_rect()
+titlerect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+screen.blit(title, titlerect)
+screen.blit(text, textrect)
+pygame.display.flip()
+while running:
+    for event in pygame.event.get():
+        if event.type == KEYDOWN:
+            if event.key == K_ESCAPE:
+                quit()
+        if event.type == QUIT:
+            quit()
+        if event.type == MOUSEBUTTONDOWN:
+            running = False
 
 playagain = True
+running = True
 
 while running and playagain:
     player = Player()
     food = Food()
     playagain = False
     while running:
-        clock.tick(5*2)
+        clock.tick(10)
         
         
         pressed_keys = pygame.key.get_pressed()
-
-        
         
         running = player.update(pressed_keys)
 
@@ -178,6 +233,8 @@ while running and playagain:
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     quit()
+                elif event.key == K_p:
+                    pauseloop()
             if event.type == QUIT:
                 quit()
         
@@ -187,10 +244,20 @@ while running and playagain:
 
         pygame.display.flip()
         
-
+    
     running = True
-    font = pygame.font.SysFont('Comic Sans MS', 30)
-    score_text = font.render(str(player.points), False, (255, 255, 255))
+    if player.points > highscore:
+        f = open("qwerty.uiop", "w")
+        f.write(str(player.points))
+        f.close()
+        highscoretext = font.render("New Highscore!", False, (255, 255, 255))
+        highscore = player.points
+    else:
+        highscoretext = font.render("Highscore: " + str(highscore), False, (255, 255, 255))
+    
+    highscoretextrect = highscoretext.get_rect()
+    highscoretextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2))
+    score_text = font.render("Score: " + str(player.points), False, (255, 255, 255))
     score_textRect = score_text.get_rect()
     score_textRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 50))
     gameover = font.render("Game Over!", False, (255, 255, 255))
@@ -198,25 +265,23 @@ while running and playagain:
     gameoverRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 100))
     quitplayagain = font.render("Esc to quit; click anywhere to play again", False, (255, 255, 255))
     quitplayagainract = quitplayagain.get_rect()
-    quitplayagainract.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2)))
+    quitplayagainract.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) + 50))
     brak = False
+    screen.fill((0, 0, 0))
     while running:
         for event in pygame.event.get():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
-                    running = False
+                    quit()
             if event.type == QUIT:
-                running = False
+                quit()
             if event.type == MOUSEBUTTONDOWN:
                 playagain = True
                 brak = True
-        screen.fill((0, 0, 0))
         screen.blit(score_text, score_textRect)
         screen.blit(gameover, gameoverRect)
         screen.blit(quitplayagain, quitplayagainract)
+        screen.blit(highscoretext, highscoretextrect)
         pygame.display.flip()
         if brak:
             break
-
-
-    
