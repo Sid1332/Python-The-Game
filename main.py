@@ -10,14 +10,19 @@ from pygame.locals import (
     KEYDOWN,
     QUIT,
     MOUSEBUTTONDOWN,
-    K_p
+    K_p,
+    K_w,
+    K_a,
+    K_s,
+    K_d,
+    K_m
 )
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, color):
         super(Player, self).__init__()
         self.surf = pygame.Surface((25, 25))
-        self.surf.fill((255, 255, 255))
+        self.surf.fill(color)
         self.rect = self.surf.get_rect()
         self.directionX = 0
         self.directionY = 25
@@ -28,7 +33,7 @@ class Player(pygame.sprite.Sprite):
         self.queuedDirections = []
         
         
-    def update(self, pressed_keys):
+    def update(self, pressed_keys, pressable):
         moved = False
         while not moved:
             if len(self.queuedDirections) > 0:
@@ -42,28 +47,28 @@ class Player(pygame.sprite.Sprite):
             else:
                 break
         
-        if pressed_keys[K_UP]:
+        if pressed_keys[pressable[0]]:
             if moved:
                 self.queuedDirections.append([0, -25])
             elif self.directionY != 25 and not (self.directionX == 0 and self.directionY == -25):
                 self.directionX = 0
                 self.directionY = -25
                 moved = True
-        if pressed_keys[K_DOWN]:
+        if pressed_keys[pressable[2]]:
             if moved:
                 self.queuedDirections.append([0, -25])
             elif self.directionY != -25 and not (self.directionX == 0 and self.directionY == 25):
                 self.directionX = 0
                 self.directionY = 25
                 moved = True
-        if pressed_keys[K_LEFT]:
+        if pressed_keys[pressable[1]]:
             if moved:
                 self.queuedDirections.append([0, -25])
             elif self.directionX != 25 and not (self.directionX == -25 and self.directionY == 0):
                 self.directionX = -25
                 self.directionY = 0
                 moved = True
-        if pressed_keys[K_RIGHT]:
+        if pressed_keys[pressable[3]]:
             if moved:
                 self.queuedDirections.append([0, -25])
             elif self.directionX != -25 and not (self.directionX == 25 and self.directionY == 0):
@@ -96,6 +101,7 @@ class Player(pygame.sprite.Sprite):
 
         if self.walldeathdelay == 0:
             return False
+            
         
         for segment in self.segments[1 : len(self.segments) - 1]:
             if self.rect.topleft == segment.position:
@@ -106,6 +112,16 @@ class Player(pygame.sprite.Sprite):
     def addPoints(self):
         self.points += 1
         self.segments.append(PlayerSegment(self, len(self.segments)))
+
+    
+    def multiplayerUpdate(self, pressed_keys, pressable, other_player):
+        for segment in other_player.segments:
+            if self.rect.topleft == segment.position:
+                return False
+        return self.update(pressed_keys, pressable)
+
+
+
         
 class PlayerSegment(pygame.sprite.Sprite):
     def __init__(self, player, index):
@@ -145,6 +161,92 @@ class Food(pygame.sprite.Sprite):
             print(self.position)
             
 
+
+
+
+def singleloop():
+    player = Player((255, 255, 255))
+    food = Food()
+    playagain = False
+    running = True
+    while running:
+        clock.tick(10)
+        
+        
+        pressed_keys = pygame.key.get_pressed()
+        
+        running = player.update(pressed_keys, [K_UP, K_LEFT, K_DOWN, K_RIGHT])
+
+        food.update(player, pressed_keys)
+  
+        screen.fill((0, 0, 0))
+
+        for segment in reversed(player.segments):
+            segment.update(player)
+            screen.blit(segment.surf, segment.position)
+
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    quit()
+                elif event.key == K_p:
+                    pauseloop()
+            if event.type == QUIT:
+                quit()
+        
+        screen.blit(food.surf, food.position)
+        screen.blit(player.surf, player.rect)
+        pygame.display.flip()
+
+    return [[player]]
+
+def multiplayerloop():
+    player1 = Player((255, 255, 255))
+    player2 = Player((0, 255, 0))
+    player2.rect.topleft = (0, 25)
+    player2.segments[0].position = (0, 25)
+    food = Food()
+    onerunning = True
+    tworunning = True
+    while onerunning and tworunning:
+        clock.tick(10)      
+        
+        pressed_keys = pygame.key.get_pressed()
+        
+        onerunning = player1.multiplayerUpdate(pressed_keys, [K_UP, K_LEFT, K_DOWN, K_RIGHT], player2) 
+        tworunning = player2.multiplayerUpdate(pressed_keys, [K_w, K_a, K_s, K_d], player1)
+
+        food.update(player1, pressed_keys)
+        food.update(player2, pressed_keys)
+        
+        screen.fill((0, 0, 0))
+
+        for segment in reversed(player1.segments):
+            segment.update(player1)
+            screen.blit(segment.surf, segment.position)
+
+        for segment in reversed(player2.segments):
+            segment.update(player2)
+            screen.blit(segment.surf, segment.position)
+
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    quit()
+                elif event.key == K_p:
+                    pauseloop()
+            if event.type == QUIT:
+                quit()
+        
+        screen.blit(food.surf, food.position)
+
+        screen.blit(player1.surf, player1.rect)
+        screen.blit(player2.surf, player2.rect)
+
+        pygame.display.flip()
+    
+    return [[player1, player2], [onerunning, tworunning]]
+  
 def pauseloop():
     running = True
     screen.fill((0, 0, 0))
@@ -169,6 +271,114 @@ def pauseloop():
             if event.type == MOUSEBUTTONDOWN:
                 running = False
 
+def gameloop(singleplayer):
+    if singleplayer:
+        return singleloop()
+    else:
+        return multiplayerloop()
+    
+def gameoverloop(singleplayer, highscore, players):
+    font = pygame.font.SysFont('Comic Sans MS', 30)
+    quitplayagain = font.render("Esc to quit; click anywhere to play again", False, (255, 255, 255))
+    quitplayagainract = quitplayagain.get_rect()
+    running = True
+    screen.fill((0, 0, 0))
+    if singleplayer:
+        if players[0][0].points > highscore:
+            f = open("qwerty.uiop", "w")
+            f.write(str(players[0][0].points))
+            f.close()
+            highscoretext = font.render("New Highscore!", False, (255, 255, 255))
+            highscore = players[0][0].points
+        else:
+            highscoretext = font.render("Highscore: " + str(highscore), False, (255, 255, 255))
+        
+        highscoretextrect = highscoretext.get_rect()
+        highscoretextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2))
+        score_text = font.render("Score: " + str(players[0][0].points), False, (255, 255, 255))
+        score_textRect = score_text.get_rect()
+        score_textRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 50))
+        quitplayagainract.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) + 50))
+        gameover = font.render("Game Over!", False, (255, 255, 255))
+        gameoverRect = gameover.get_rect()
+        gameoverRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 100))
+        brak = False
+        while running:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        quit()
+                if event.type == QUIT:
+                    quit()
+                if event.type == MOUSEBUTTONDOWN:
+                    brak = True
+            screen.blit(score_text, score_textRect)
+            screen.blit(gameover, gameoverRect)
+            screen.blit(quitplayagain, quitplayagainract)
+            screen.blit(highscoretext, highscoretextrect)
+            pygame.display.flip()
+            if brak:
+                break
+    else:
+        if players[1][0] and players[1][1]:
+            winnertext = font.render("It is a tie!", False, (255, 255, 255))
+        elif players[1][0]:
+            winnertext = font.render("Player 1 wins!", False, (255, 255, 255))
+        else:
+            winnertext = font.render("Player 2 wins!", False, (255, 255, 255))
+
+        winnertextrect = winnertext.get_rect()
+        winnertextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) - 25)
+        quitplayagainract.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) + 25))
+        screen.blit(winnertext, winnertextrect)
+        screen.blit(quitplayagain, quitplayagainract)
+        pygame.display.flip()
+        while running:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        quit()
+                if event.type == QUIT:
+                    quit()
+                if event.type == MOUSEBUTTONDOWN:
+                    running = False
+
+def titleloop():
+    font = pygame.font.SysFont('Comic Sans MS', 30)
+    secondfont = pygame.font.SysFont('Comic Sans MS', 15)
+    thirdfont = pygame.font.SysFont('Comic Sans MS', 10)
+    text = secondfont.render("For Singleplayer mode: Arrow Keys to move - P to pause - Press S to start", False, (255, 255, 255))
+    textrect = text.get_rect()
+    textrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) + 25)
+    secondtext = secondfont.render("For Multiplayer mode: Arrow Keys to move Player 1 - WASD to move Player 2 - P to pause - Press M to start", False, (255, 255, 255))
+    secondtextrect = secondtext.get_rect()
+    secondtextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) + 45)
+    title = font.render("Python (The Game)", False, (255, 255, 255))
+    titlerect = title.get_rect()
+    titlerect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    credittext = thirdfont.render("Made by Siddhartha Guggilam", False, (255, 255, 255))
+    credittextrect = credittext.get_rect()
+    credittextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) + 59)
+    screen.blit(title, titlerect)
+    screen.blit(text, textrect)
+    screen.blit(secondtext, secondtextrect)
+    screen.blit(credittext, credittextrect)
+    pygame.display.flip()
+    while True:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    quit()
+                if event.key == K_m:
+                    return False
+                if event.key == K_s:
+                    return True
+            if event.type == QUIT:
+                quit()
+            
+def credits():
+    font = pygame.font.SysFont('Comic Sans MS', 30)
+    secondfont = pygame.font.SysFont('Comic Sans MS', 15)
 
 pygame.init()
 pygame.display.set_caption("Python (the game)")
@@ -183,105 +393,10 @@ f = open("qwerty.uiop", "r")
 highscore = int(f.read(10))
 f.close()
 
-font = pygame.font.SysFont('Comic Sans MS', 30)
-secondfont = pygame.font.SysFont('Comic Sans MS', 15)
-text = secondfont.render("Arrow Keys to move - P to pause - Click to start", False, (255, 255, 255))
-textrect = text.get_rect()
-textrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2) + 25)
-title = font.render("Python (The Game)", False, (255, 255, 255))
-titlerect = title.get_rect()
-titlerect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-screen.blit(title, titlerect)
-screen.blit(text, textrect)
-pygame.display.flip()
-while running:
-    for event in pygame.event.get():
-        if event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-                quit()
-        if event.type == QUIT:
-            quit()
-        if event.type == MOUSEBUTTONDOWN:
-            running = False
+singleplayer = titleloop()
 
-playagain = True
 running = True
-
-while running and playagain:
-    player = Player()
-    food = Food()
-    playagain = False
-    while running:
-        clock.tick(10)
-        
-        
-        pressed_keys = pygame.key.get_pressed()
-        
-        running = player.update(pressed_keys)
-
-        food.update(player, pressed_keys)
-
-        
-        screen.fill((0, 0, 0))
-
-
-        for segment in reversed(player.segments):
-            segment.update(player)
-            screen.blit(segment.surf, segment.position)
-
-        for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    quit()
-                elif event.key == K_p:
-                    pauseloop()
-            if event.type == QUIT:
-                quit()
-        
-        screen.blit(food.surf, food.position)
-
-        screen.blit(player.surf, player.rect)
-
-        pygame.display.flip()
-        
+while running:
+    players = gameloop(singleplayer)
     
-    running = True
-    if player.points > highscore:
-        f = open("qwerty.uiop", "w")
-        f.write(str(player.points))
-        f.close()
-        highscoretext = font.render("New Highscore!", False, (255, 255, 255))
-        highscore = player.points
-    else:
-        highscoretext = font.render("Highscore: " + str(highscore), False, (255, 255, 255))
-    
-    highscoretextrect = highscoretext.get_rect()
-    highscoretextrect.center = (SCREEN_WIDTH // 2, (SCREEN_HEIGHT // 2))
-    score_text = font.render("Score: " + str(player.points), False, (255, 255, 255))
-    score_textRect = score_text.get_rect()
-    score_textRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 50))
-    gameover = font.render("Game Over!", False, (255, 255, 255))
-    gameoverRect = gameover.get_rect()
-    gameoverRect.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) - 100))
-    quitplayagain = font.render("Esc to quit; click anywhere to play again", False, (255, 255, 255))
-    quitplayagainract = quitplayagain.get_rect()
-    quitplayagainract.center = (((SCREEN_WIDTH//2), (SCREEN_HEIGHT//2) + 50))
-    brak = False
-    screen.fill((0, 0, 0))
-    while running:
-        for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    quit()
-            if event.type == QUIT:
-                quit()
-            if event.type == MOUSEBUTTONDOWN:
-                playagain = True
-                brak = True
-        screen.blit(score_text, score_textRect)
-        screen.blit(gameover, gameoverRect)
-        screen.blit(quitplayagain, quitplayagainract)
-        screen.blit(highscoretext, highscoretextrect)
-        pygame.display.flip()
-        if brak:
-            break
+    gameoverloop(singleplayer, highscore, players)
